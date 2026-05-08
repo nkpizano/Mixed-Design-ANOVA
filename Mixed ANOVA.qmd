@@ -1,0 +1,227 @@
+---
+title: "Mixed ANOVA"
+author: "Netasha K Pizano"
+output:
+  html_document:
+    toc: TRUE
+    toc_float:
+      collapsed: false      # keep TOC fully expanded (no accordion)
+      smooth_scroll: true   # nice scrolling on click
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+editor: visual
+bibliography: references.bib
+---
+
+## Section Overview
+
+In the following lab, we review how to apply a mixed analysis of variance (ANOVA) with two factors: a within-subjects factor that measures changes over time within individuals and a between-subjects factor that identifies differences based on group/treatment/condition characteristics and how to evaluate their interaction. A mixed model ANOVA tests whether each of the three effects—the two main effects and the interaction effect—is statistically significant. Using a study that reviews current large language model (LLM) chatbots for workplace therapy [@yuan2025], we will evaluate differences in workplace burnout pre- and post-therapeutic approach, including hypothetical LLM chatbots and in-person therapy.
+
+![](Therapy.jpg) 
+
+## Study Overview
+
+In the following study we are going to explore the effectiveness of two different mental health therapeutic approaches to reduce feelings of workplace burnout in 60 employees over time. Specifically, the between-subjects factor includes a 30 minute session with Rubi (TxR) an LLM chat bot or in-person therapy (TxInP). The within-subjects factor of reported workplace burnout is measured at the beginning of the therapy (T1), midway through the therapy (T2), and "at discharge (T3).
+
+## Hypothesis
+
+- Inteaction $$H_0 =$$ There is no significant interaction between therapeutic approach and time conditions on reported levels of workplace burnout.
+
+$$H_A =$$ There is a significant interaction between therapeutic approach and time conditions on reported levels of workplace burnout.
+
+- Within Subjects Main Effect
+
+$$H_0 = T_{1burnout} = T_{2burnout} = T_{3burnout}$$ There are no mean differences in employees reported workplace burnout across time.
+
+$$H_A = T_{1burnout} \neq T_{2burnout} \neq T_{3burnout}$$ There are mean differences in employees reported workplace burnout across time.
+
+- Between Subjects Main Effect
+
+$$H_0 = T_{TxRubi} = T_{TxInP} $$ There are no mean differences in employees reported workplace burnout based on therapeutic approach.
+
+$$H_A = Tx_{Rubi} \neq Tx_{InP} $$ There are mean differences in employees reported workplace burnout based on therapeutic approach. 
+
+## Packages
+
+```{r, message = FALSE}
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(skimr)
+#install.packages("car") # remove the first "#" and then run the line
+library(car)
+#install.packages("afex") # remove the first "#" and then run the line
+#used with package for ANOVA
+library(afex)
+#install.packages("emmeans") # remove the first "#" and then run the line
+#used this package to evaluate where means were statistically significant 
+library(emmeans)
+#Used this package for ANOVA 
+library(rstatix)
+```
+
+```{r, include=FALSE}
+set.seed(123)
+
+# 60 total participants
+n <- 60
+
+# Create wide data
+burnout_data_wide <- tibble(
+  id = 1:n,
+  treatment = rep(c("rubi", "in_person_therapy"), each = n/2)
+) %>%
+  mutate(
+    T1 = rnorm(n, mean = 70, sd = 8),
+    T2 = case_when(
+      treatment == "rubi" ~ T1 - rnorm(n, mean = 5, sd = 5),
+      treatment == "in_person_therapy" ~ T1 - rnorm(n, mean = 5, sd = 5)
+    ),
+    T3 = case_when(
+      treatment == "rubi" ~ T1 - rnorm(n, mean = 5, sd = 5),
+      treatment == "in_person_therapy" ~ T1 - rnorm(n, mean = 18, sd = 5)
+    )
+  )
+
+# Convert to long format for mixed ANOVA
+burnout_data_long <- burnout_data_wide %>%
+  pivot_longer(
+    cols = c(T1, T2, T3),
+    names_to = "time",
+    values_to = "burnout"
+  ) %>%
+  mutate(
+    id = factor(id),
+    treatment = factor(treatment),
+    time = factor(time, levels = c("T1", "T2", "T3"))
+  )
+
+#this is me writing the csv file 
+write.csv(burnout_data_long, "burnout.csv")
+```
+
+## Data Exploration
+
+Always take a look and explore the data before moving on to analyzing the data.
+
+```{r, message = FALSE}
+
+#this is me reading in the data 
+burnout <- read_csv("burnout.csv")
+
+#this is me removing column 1 
+burnout <- burnout[, -1]
+
+#review the data using skimR
+skim(burnout) 
+
+#This is me looking at the burnout by treatment and and time for data exploration purpose
+burnout_data_long %>%
+group_by(treatment, time) %>%
+summarise(
+mean_burnout = mean(burnout),
+sd_burnout = sd(burnout),
+.groups = "drop")
+
+```
+
+## Assumptions
+
+- Independence of Observations
+
+  - Observations are only assigned to one treatment group.
+
+  - There is no statistical approach to determine if this assumption is met. Understanding the study design is key. Make sure that each participant belongs to one group.
+
+- Normality of Residuals
+
+  - Residuals represent the variance that is not explained by the model. The difference between the line of best fit and the actual data or the difference between the predicted values and actual data.
+
+  - We want to ensure that residuals are normally distributed. Meeting this assumptions provides some confidence that our p-value and confidence intervals are accurate. When this assumptions is not met we could end up making a type 1 error. This is sometimes referred to as noise.
+  
+  - We can evaluate residuals by running an linear model, saving residuals and then plotting those residuals. 
+
+```{r}
+# Extract residuals (approximate approach)
+
+res <- residuals(lm(burnout ~ treatment * time, data = burnout))
+
+# Histogram
+hist(res)
+
+# Q-Q plot (make sure to run these two lines of code together)
+qqnorm(res)
+qqline(res)
+```
+
+## Homogeneity of variance 
+
+- Suggests that the variance should be equal across treatment groups. Each group will have their own mean, but the variation among subjects around their group means should be the same. 
+
+- If one group has large variance, that group can contribute to larger residuals or more noise left to be explained by the model.
+
+- If this assumption is not met we could inflate type 1 error. 
+
+- We can use the Levene's Test of equal variance:
+
+  - the null (p > .05) suggests that variances are equal. The assumption of homogeneity of variance is met. 
+  
+  - the alternative (p < .05) at least one group has different variances. The assumption of homogeneity of variance is not met. However, if not met know that ANOVA is robust when we have equal sample size. 
+
+```{r}
+# Use the levene test
+leveneTest(burnout ~ treatment, data = burnout_data_long)
+```
+
+# Sphericity and Mixed ANOVA
+
+ - Variance of differences between time points should be equal. Meeting the assumption of sphericity is crucial. Its the comparison of time points variances to one another. 
+ 
+ - If the difference in variances between pairs of time points are different, then there is a higher chance of type one error and bias in findings. 
+ 
+ - We can evaluate Mauchly's Test of Sphercity. Variances are equal if Mauchly's test is not significant (p > .05). 
+ 
+   - If the test is significant (p < .05), the variances are not equal (The assumption of Sphericity is not met) and we should use either Greenhouse-Gaisser or Huynh-Feldt approach to deal with the violation.
+   
+- We can run a mixed ANOVA using aov-ez (there are others: exANOVA, anova_test), which will provide Mauchly's test 
+  - Automatically, will deal with sphericity. 
+  - Results will provide main effects and interaction 
+
+```{r}
+#Use the aov_ex to run a mixed ANOVA
+# set the id, dv, and  between and within factors
+anova_model <- aov_ez(
+id = "id",
+dv = "burnout",
+between = "treatment",
+within = "time",
+data = burnout_data_long
+)
+
+anova_model
+
+
+```
+
+- We can see that Greenhouse-Gaisser (GG) was used to deal with Sphericity. 
+
+- We can see that there is a significant interaction. So we need to follow up with comparisons using the emmeans function, which will compare the treatment conditions (rubi vs. in-person) across time.
+
+```{r}
+#another way to run Mixed ANOVA
+burnout_data_long %>%
+  anova_test(dv = burnout, wid = id, within = time, between = treatment)
+```
+
+```{r}
+#this is me using the emmeans function to evaluate mean differences across condition and time 
+emmeans(anova_model, pairwise ~ treatment | time)
+```
+
+## Example Write up 
+A mixed-design ANOVA was conducted to investigate the effects of mental health therapeutic approaches, Rubi versus in-person therapy, and time on workplace burnout.
+
+Prior to evaluation of inteaction of main effects assumptions were evaluated. Mauchly’s test indicated that the assumption of sphericity was violated, χ²(df) = 0.73, p < .05; therefore, Greenhouse–Geisser corrected results are reported.
+
+Results suggest that there was a statistically significant interaction affects between treatment and time with an $F(1.57, 91.31) = 71.653, p <. 05$. At T3, the in-person therapy group reported substantially lower burnout (M = 51.7, SD = 9.22) compared to the rubi group (M = 64.5, SD = 8.86).
