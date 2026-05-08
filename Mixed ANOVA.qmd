@@ -18,7 +18,7 @@ bibliography: references.bib
 
 In the following lab, we review how to apply a mixed analysis of variance (ANOVA) with two factors: a within-subjects factor that measures changes over time within individuals and a between-subjects factor that identifies differences based on group/treatment/condition characteristics and how to evaluate their interaction. A mixed model ANOVA tests whether each of the three effects—the two main effects and the interaction effect—is statistically significant. Using a study that reviews current large language model (LLM) chatbots for workplace therapy [@yuan2025], we will evaluate differences in workplace burnout pre- and post-therapeutic approach, including hypothetical LLM chatbots and in-person therapy.
 
-![](Therapy.jpg) 
+![](Therapy.jpg)
 
 ## Study Overview
 
@@ -40,7 +40,7 @@ $$H_A = T_{1burnout} \neq T_{2burnout} \neq T_{3burnout}$$ There are mean differ
 
 $$H_0 = T_{TxRubi} = T_{TxInP} $$ There are no mean differences in employees reported workplace burnout based on therapeutic approach.
 
-$$H_A = Tx_{Rubi} \neq Tx_{InP} $$ There are mean differences in employees reported workplace burnout based on therapeutic approach. 
+$$H_A = Tx_{Rubi} \neq Tx_{InP} $$ There are mean differences in employees reported workplace burnout based on therapeutic approach.
 
 ## Packages
 
@@ -139,8 +139,8 @@ sd_burnout = sd(burnout),
   - Residuals represent the variance that is not explained by the model. The difference between the line of best fit and the actual data or the difference between the predicted values and actual data.
 
   - We want to ensure that residuals are normally distributed. Meeting this assumptions provides some confidence that our p-value and confidence intervals are accurate. When this assumptions is not met we could end up making a type 1 error. This is sometimes referred to as noise.
-  
-  - We can evaluate residuals by running an linear model, saving residuals and then plotting those residuals. 
+
+  - We can evaluate residuals by running an linear model, saving residuals and then plotting those residuals.
 
 ```{r}
 # Extract residuals (approximate approach)
@@ -155,19 +155,19 @@ qqnorm(res)
 qqline(res)
 ```
 
-## Homogeneity of variance 
+## Homogeneity of variance
 
-- Suggests that the variance should be equal across treatment groups. Each group will have their own mean, but the variation among subjects around their group means should be the same. 
+- Suggests that the variance should be equal across treatment groups. Each group will have their own mean, but the variation among subjects around their group means should be the same.
 
 - If one group has large variance, that group can contribute to larger residuals or more noise left to be explained by the model.
 
-- If this assumption is not met we could inflate type 1 error. 
+- If this assumption is not met we could inflate type 1 error.
 
 - We can use the Levene's Test of equal variance:
 
-  - the null (p > .05) suggests that variances are equal. The assumption of homogeneity of variance is met. 
-  
-  - the alternative (p < .05) at least one group has different variances. The assumption of homogeneity of variance is not met. However, if not met know that ANOVA is robust when we have equal sample size. 
+  - the null (p \> .05) suggests that variances are equal. The assumption of homogeneity of variance is met.
+
+  - the alternative (p \< .05) at least one group has different variances. The assumption of homogeneity of variance is not met. However, if not met know that ANOVA is robust when we have equal sample size.
 
 ```{r}
 # Use the levene test
@@ -176,17 +176,18 @@ leveneTest(burnout ~ treatment, data = burnout_data_long)
 
 # Sphericity and Mixed ANOVA
 
- - Variance of differences between time points should be equal. Meeting the assumption of sphericity is crucial. Its the comparison of time points variances to one another. 
- 
- - If the difference in variances between pairs of time points are different, then there is a higher chance of type one error and bias in findings. 
- 
- - We can evaluate Mauchly's Test of Sphercity. Variances are equal if Mauchly's test is not significant (p > .05). 
- 
-   - If the test is significant (p < .05), the variances are not equal (The assumption of Sphericity is not met) and we should use either Greenhouse-Gaisser or Huynh-Feldt approach to deal with the violation.
-   
-- We can run a mixed ANOVA using aov-ez (there are others: exANOVA, anova_test), which will provide Mauchly's test 
-  - Automatically, will deal with sphericity. 
-  - Results will provide main effects and interaction 
+- Variance of differences between time points should be equal. Meeting the assumption of sphericity is crucial. Its the comparison of time points variances to one another.
+
+- If the difference in variances between pairs of time points are different, then there is a higher chance of type one error and bias in findings.
+
+- We can evaluate Mauchly's Test of Sphercity. Variances are equal if Mauchly's test is not significant (p \> .05).
+
+  - If the test is significant (p \< .05), the variances are not equal (The assumption of Sphericity is not met) and we should use either Greenhouse-Gaisser or Huynh-Feldt approach to deal with the violation.
+
+- We can run a mixed ANOVA using aov-ez (there are others: exANOVA, anova_test), which will provide Mauchly's test
+
+  - Automatically, will deal with sphericity.
+  - Results will provide main effects and interaction
 
 ```{r}
 #Use the aov_ex to run a mixed ANOVA
@@ -204,7 +205,7 @@ anova_model
 
 ```
 
-- We can see that Greenhouse-Gaisser (GG) was used to deal with Sphericity. 
+- We can see that Greenhouse-Gaisser (GG) was used to deal with Sphericity.
 
 - We can see that there is a significant interaction. So we need to follow up with comparisons using the emmeans function, which will compare the treatment conditions (rubi vs. in-person) across time.
 
@@ -219,9 +220,6 @@ burnout_data_long %>%
 emmeans(anova_model, pairwise ~ treatment | time)
 ```
 
-## Example Write up 
-A mixed-design ANOVA was conducted to investigate the effects of mental health therapeutic approaches, Rubi versus in-person therapy, and time on workplace burnout.
+## Example Write up
 
-Prior to evaluation of inteaction of main effects assumptions were evaluated. Mauchly’s test indicated that the assumption of sphericity was violated, χ²(df) = 0.73, p < .05; therefore, Greenhouse–Geisser corrected results are reported.
-
-Results suggest that there was a statistically significant interaction affects between treatment and time with an $F(1.57, 91.31) = 71.653, p <. 05$. At T3, the in-person therapy group reported substantially lower burnout (M = 51.7, SD = 9.22) compared to the rubi group (M = 64.5, SD = 8.86).
+A mixed-design ANOVA was conducted to investigate the effects of mental health therapeutic approaches (Rubi vs. in-person therapy) and time on workplace burnout.Before evaluating the interaction of main effects, the assumptions were checked. Mauchly’s test indicated that the assumption of sphericity was violated, χ²(2) = 0.73, p \< .05; therefore, Greenhouse–Geisser corrected results are reported.Results suggest that there was a statistically significant interaction effect between treatment and time with an \$F(1.57, 91.31) = 71.653, p \<. 05\$. At T3, the in-person therapy group reported substantially lower burnout (M = 51.7, SD = 9.22) compared to the rubi group (M = 64.5, SD = 8.86).
